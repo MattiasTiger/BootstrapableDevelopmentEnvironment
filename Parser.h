@@ -26,9 +26,21 @@ public:
 	Statement statement;
 
 public:
-	StatementTree() { isList = true; }
+	StatementTree() { parent = this; isList = true; }
 	StatementTree(StatementTree * parent) : parent(parent) { isList = true; }
 	StatementTree(Statement statement) : statement(statement) { isList = false; }
+
+	StatementTree * newGroup();
+	StatementTree *  removeGroup();
+};
+
+class Trie;
+class ParentContainer
+{
+public:
+	Trie * pattern;
+	StatementTree * group;
+	ParentContainer(Trie * p, StatementTree * g) : pattern(p),group(g) {}
 };
 
 ///////////////////////
@@ -39,9 +51,10 @@ public:
 	std::string pattern;
 	std::string separators;		// e.g. ' ', '\n', '\t'
 	bool (*handler) (StatementTree & st, Pattern & p);
+	StatementTree * arguments;
 
 public:
-	Pattern(std::string pattern, bool (*handler) (StatementTree & st, Pattern & p)): pattern(pattern), handler(handler) {}
+	Pattern(std::string pattern, bool (*handler) (StatementTree & st, Pattern & p)): pattern(pattern), handler(handler) { arguments = 0; }
 };
 
 class Trie
@@ -54,6 +67,12 @@ public:
 public:
 	Trie() { memset(branch, 0, sizeof(branch)); p = 0; requireChild = false; }
 	bool add(std::string & pattern, Pattern * p, int index = 0);
+
+	bool isConsistent(char c) { return branch[c] != 0; }
+	bool isFinished() { return p != 0; }
+	bool hasSubPattern() { return branch['$'] != 0; }
+	void executeHandler(StatementTree * group) { p->handler(*group, *p); } // dfggdfss fgdgsdfsg dsg df
+	ParentContainer getReturnPoint(StatementTree * group) { return ParentContainer(branch['$'], group); }
 };
 
 ////////////////////////
@@ -120,3 +139,4 @@ public:
 */
 
 #endif // _PARSER_H_
+
