@@ -2,10 +2,7 @@
 
 Parser::Parser(void)
 {
-<<<<<<< HEAD
 
-=======
->>>>>>> origin/master
 }
 
 
@@ -23,10 +20,7 @@ void Parser::parse(std::string str)
 	
 	while(n <= str.length())
 	{
-<<<<<<< HEAD
 		std::cout << "> '" << str[n] << "'\n";
-=======
->>>>>>> origin/master
 		if(node->branch[str[n]] != 0)	// is there a pattern that continue to match the string?
 		{
 			node = node->branch[str[n]];
@@ -38,18 +32,8 @@ void Parser::parse(std::string str)
 
 			if(!statements->isList && statements != &statementTree)
 				statements = statements->parent;
-<<<<<<< HEAD
 			
 			node = &patternTrie;
-=======
-
-			if(!parentPattern.empty()) {
-				node = parentPattern.top();
-				parentPattern.pop();
-			}
-			else
-				node = &patternTrie;
->>>>>>> origin/master
 		}
 		else if(node->requireChild)		// child branching?
 		{
@@ -61,7 +45,6 @@ void Parser::parse(std::string str)
 		}
 		else
 		{
-<<<<<<< HEAD
 			if(!parentPattern.empty()) {
 				node = parentPattern.top();
 				parentPattern.pop();
@@ -72,19 +55,6 @@ void Parser::parse(std::string str)
 			{
 				std::cout << "! token #" << n << " ('" << str[n] << "') does not match anything!\n";
 				node = &patternTrie;
-=======
-			if(n == str.length())
-				n++;
-			else
-			{
-				if(!parentPattern.empty()) {
-					node = parentPattern.top();
-					parentPattern.pop();
-				}
-				else {
-					std::cout << "! token #" << n << " ( " << str[n] << ") does not match anything!\n";
-				}
->>>>>>> origin/master
 			}
 		}
 	}
