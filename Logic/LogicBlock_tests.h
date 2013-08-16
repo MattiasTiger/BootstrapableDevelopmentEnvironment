@@ -1,0 +1,1 @@
+void LogicBlock_tests();
