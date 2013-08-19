@@ -49,7 +49,7 @@ public:
 		return branch[(unsigned char)expression[index]]->add(expression, data, handler, index+1);
 	}
 
-	bool add(DFA_Trie * expression) {
+	bool add_(DFA_Trie * expression) {
 		// Should check for inconsistencies!
 		std::list<DFA_Trie*> goals_dummy;
 		merge(this, expression, goals_dummy);
@@ -102,7 +102,7 @@ void toString_DFA_Trie(std::string & o, std::string & path, DFA_Trie<D,A> * node
 	if(node == 0)
 		return;
 	if(n == 0 && node->isFinished() && !node->visited)
-		o += path + " -> " + std::to_string((int)node->data) + " @" + std::to_string((int)node->handler) + " (&" + std::to_string((int)node) +")\n";
+		o += path + " -> " + std::to_string((int)node->data) + " (" + std::to_string((int)node) +")\n";
 	if(node->branch[n] == 0)
 		return;
 	if(node->branch[n]->visited)
@@ -161,7 +161,7 @@ void merge(DFA_Trie<D,A> * n1, DFA_Trie<D,A> * n2, std::list<DFA_Trie<D,A> *> & 
 				(*it)->add_branch(b, n1);
 	}
 	*/
-
+	
 	// Copy non-colliding branches to n
 	for(int b = 0; b < 256; b++)
 		if(n2->branch[b] != 0 && n1->branch[b] == 0)
@@ -170,16 +170,12 @@ void merge(DFA_Trie<D,A> * n1, DFA_Trie<D,A> * n2, std::list<DFA_Trie<D,A> *> & 
 			else
 				n1->add_branch(b, n2->branch[b]);
 	
-	// Solve collision involving self-circular paths
-	// ?
-
 	// Solve collisions
 	for(int b = 0; b < 256; b++)
 		if(n1->branch[b] != 0 && n2->branch[b] != 0 && n1->branch[b] != n2->branch[b] && !(n1 == n1->branch[b] && n2 == n2->branch[b]))
 		{
 			DFA_Trie<D,A> * n_ = new DFA_Trie<D,A>();
 			n_->data = n2->branch[b]->data;
-			n_->handler = n2->branch[b]->handler;
 			//goals.remove(n2->branch[b]); // Only in certain cases!
 			for(int i = 0; i < 256; i++)
 				if(n2->branch[b]->branch[i] != 0)

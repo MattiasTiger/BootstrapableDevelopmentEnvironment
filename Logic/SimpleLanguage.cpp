@@ -10,14 +10,19 @@ void simple_language_test()
 	memoryManager.addType(new Type("int", 4));
 
 	Parser<LogicBlock*> p;
-//	RegularExpressionParser<LogicBlock*> p_regexp;
-//	p_regexp.init();
-//	p_regexp.parse("( |\t|\n)*");
-//	p.addPattern(p_regexp.statementTree.children.front()->statement.start);
+	RegularExpressionParser<LogicBlock*,Statement_regexp_<LogicBlock*> > p_regexp;
+	p_regexp.init();
+	//p_regexp.parse("( |\t|\n)*");
+	//DFA_Trie<Pattern<LogicBlock*>,StatementTree<LogicBlock*> > * pat = p_regexp.parse("abc", (Pattern<LogicBlock*>*)1337);
+	//DFA_Trie<Pattern<LogicBlock*>,StatementTree<LogicBlock*> > * pat = p_regexp.parse("( |\t|\n)*", (Pattern<LogicBlock*>*)0);
+	
+	p.addPattern_(p_regexp.parse("( |\t|\n)*", 0));
+	Pattern_logic * l = new Pattern_logic("(0|1|2|3|4|5|6|7|8|9)",handler_constant);
+	p.addPattern_(p_regexp.parse("(0|1|2|3|4|5|6|7|8|9)", l));
 
-	p.addPattern(Pattern_logic("0", handler_constant));
-	p.addPattern(Pattern_logic("1", handler_constant));
-	p.addPattern(Pattern_logic("5", handler_constant));
+	//p.addPattern(Pattern_logic("0", handler_constant));
+	//p.addPattern(Pattern_logic("1", handler_constant));
+	//p.addPattern(Pattern_logic("5", handler_constant));
 	p.addPattern(Pattern_logic("int a", handler_variableDeclaration));
 	p.addPattern(Pattern_logic("a", handler_variable));
 	p.addPattern(Pattern_logic("if($) $ else $", handler_if));
@@ -38,22 +43,19 @@ void simple_language_test()
 	in = "print(1+5)";
 	in = "if(1==0) print(1) else print(0)";
 	in = "{int aa=5;print(a)}";	// Will be solved using a termination property to patterns.
-	//in = " 1 + 1 ";
+	in = "{\n\tint a\n\ta = 9 + 2;\n\tprint( a )\n}";
 	p.parse(in);
 	LogicBlock * program = p.statementTree.children.front()->statement;
+	std::cout << "\nin:\n" << in << "\n\nout:\n";
 	program->eval();
 	std::cout << "\n";
 	//std::cout << *(int*)program->value << "\n";
 
 }
 
-
-
-
-
 bool handler_constant(StatementTree_logic & st, Pattern_logic & p, std::string & str)
 {
-	trim(str);
+	trim(str, " \t\n");
 	LogicBlock_data * data = new LogicBlock_data();
 	data->value = memoryManager.allocate(memoryManager.getType("int"));
 	*(int*)data->value = int(str[0] - '0');
@@ -64,7 +66,7 @@ bool handler_constant(StatementTree_logic & st, Pattern_logic & p, std::string &
 }
 bool handler_variable(StatementTree_logic & st, Pattern_logic & p, std::string & str)
 {
-	trim(str);
+	trim(str, " \t\n");
 	char * variable = memoryManager.getVariable(str);
 	if(!variable)
 		std::cout << "Error: No variable named \"" << str << "\" declared!\n";
@@ -86,6 +88,8 @@ bool handler_variableDeclaration(StatementTree_logic & st, Pattern_logic & p, st
 	split(str, ' ', parts);
 	std::string typeName = parts.front();
 	std::string variableName = parts.back();
+	trim(typeName, " \t\n");
+	trim(variableName, " \t\n");
 	Type * type = memoryManager.getType(typeName);
 	if(!type)
 		std::cout << "Error: No type named \"" << typeName << "\" declared!\n";
@@ -251,13 +255,15 @@ bool handler_functionDeclaration(StatementTree_logic & st, Pattern_logic & p, st
 
 
 
-void trim(std::string & str)
+void trim(std::string & str, std::string discard)
 {
+	if(str.empty())
+		return;
 	unsigned int start = 0;
-	unsigned int end = str.size()-1;
-	while(start < str.size()  && str[start] == ' ')
+	unsigned int end = str.size();
+	while(start < str.size() && std::find(discard.begin(),discard.end(),str[start]) != discard.end())
 		start++;	
-	while(end > 0 && str[end] == ' ')
+	while(end > 0 && std::find(discard.begin(),discard.end(),str[start]) != discard.end())
 		end--;
 	if(end > 0)
 		str = str.substr(start, end-start);
@@ -265,6 +271,8 @@ void trim(std::string & str)
 
 void split(std::string & str, char splitter, std::list<std::string> & result)
 {
+	if(str.empty())
+		return;
 	bool word = str[0] != splitter;
 	unsigned int n = 0;
 	unsigned int start = 0;

@@ -28,7 +28,7 @@ bool handler_paranthesis(StatementTree_logic & st, Pattern_logic & p, std::strin
 bool handler_statementSeparation(StatementTree_logic & st, Pattern_logic & p, std::string & str);
 
 
-void trim(std::string & str);
+void trim(std::string & str, std::string discard);
 void split(std::string & str, char splitter, std::list<std::string> & result);
 
 
