@@ -58,7 +58,7 @@ public:
 	void parse(std::string str) {
 		Parser::parse(str);
 	}
-	DFA * parse(std::string str, Pattern<S> * p) {
+	DFA * parse(std::string str, Pattern<S> * p, bool terminate = false) {
 		parse(str);
 		StatementTree<S_wrapper> st = statementTree.children.front()->statement;
 		statementTree.parent->children.erase((++statementTree.parent->children.rbegin()).base());
@@ -73,7 +73,9 @@ public:
 			(*it)->data = p;
 			if(p)
 				(*it)->handler = p->handler;
+			(*it)->terminate = terminate;
 		}
+		statementTree.clear();
 		return st.statement.start;
 	}
 
@@ -91,8 +93,8 @@ public:
 
 		// Regular expression base rules
 		addPattern(Pattern_regexp("($)", handler_parentheses<S,S_wrapper>));
-		addPattern(Pattern_regexp("|$", handler_divider<S,S_wrapper>));
-		addPattern(Pattern_regexp("*", handler_kleinClosure<S,S_wrapper>));
+		addPattern(Pattern_regexp("$|$", handler_divider<S,S_wrapper>));
+		addPattern(Pattern_regexp("$*", handler_kleinClosure<S,S_wrapper>));
 
 		// Allow for the usage of the special characters
 		addPattern(Pattern_regexp("\\\\", handler_character<S,S_wrapper>));
@@ -100,6 +102,7 @@ public:
 		addPattern(Pattern_regexp("\\)", handler_character<S,S_wrapper>));
 		addPattern(Pattern_regexp("\\|", handler_character<S,S_wrapper>));
 		addPattern(Pattern_regexp("\\*", handler_character<S,S_wrapper>));
+		addPattern(Pattern_regexp("\\$", handler_character<S,S_wrapper>));
 	}
 };
 

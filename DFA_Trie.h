@@ -25,12 +25,13 @@ public:
 	D * data;
 	bool (*handler)(A & arg, D & data, std::string & str);
 	bool visited;
+	bool terminate;
 
 public:
-	DFA_Trie()					{ memset(branch, 0, sizeof(branch)); data = 0; visited = false; handler = 0;}
-	DFA_Trie(DFA_Trie * parent) { memset(branch, 0, sizeof(branch)); data = 0; visited = false; handler = 0; parents.push_back(parent); }
+	DFA_Trie()					{ memset(branch, 0, sizeof(branch)); data = 0; visited = false; terminate = false; handler = 0;}
+	DFA_Trie(DFA_Trie * parent) { memset(branch, 0, sizeof(branch)); data = 0; visited = false; terminate = false; handler = 0; parents.push_back(parent); }
 
-	bool add(std::string & expression, D * data, bool (*handler)(A & arg, D & data, std::string & str), unsigned int index = 0) {
+	bool add(std::string & expression, D * data, bool (*handler)(A & arg, D & data, std::string & str), bool terminate = false, unsigned int index = 0) {
 		if(expression.size() < index)
 			return false;
 
@@ -40,16 +41,17 @@ public:
 			//{
 				this->data = data;
 				this->handler = handler;
+				this->terminate = terminate;
 				return true;
 			//}
 			//return false;
 		}
 		if(branch[(unsigned char)expression[index]] == 0)
 			branch[(unsigned char)expression[index]] = new DFA_Trie(this);
-		return branch[(unsigned char)expression[index]]->add(expression, data, handler, index+1);
+		return branch[(unsigned char)expression[index]]->add(expression, data, handler, terminate, index+1);
 	}
 
-	bool add_(DFA_Trie * expression) {
+	bool add(DFA_Trie * expression) {
 		// Should check for inconsistencies!
 		std::list<DFA_Trie*> goals_dummy;
 		merge(this, expression, goals_dummy);
@@ -80,6 +82,7 @@ public:
 
 	bool isConsistent(char c)	{ return branch[c] != 0; }
 	bool isFinished()			{ return data != 0; }
+	bool terminates()			{ return terminate; }
 	bool hasSubPattern()		{ return branch[SUBPATTERN_SYMBOL] != 0; }
 	void executeHandler(A * arg, std::string & str)
 								{ handler(*arg, *data, str); }
@@ -120,7 +123,7 @@ void toString_DFA_Trie(std::string & o, std::string & path, DFA_Trie<D,A> * node
 			}
 			else
 			{
-				o += path + " -> <loop: " + std::to_string((int)node) + ">";
+				o += path + char(n) + " -> <loop: " + std::to_string((int)node) + ">";
 				o += "\n";
 			}
 		}

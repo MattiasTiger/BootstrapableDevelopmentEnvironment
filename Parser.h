@@ -56,7 +56,9 @@ public:
 	void removeFirstPre()  { parent->children.erase((++++parent->children.rbegin()).base()); }
 	void removeFirstPost() { children.erase(children.begin()); }
 	void removeRestPost()  { std::list<StatementTree*>::iterator i = ++children.begin(); while(i != children.end()) children.erase(i++); }
+	void removeThis() { parent->children.erase((++parent->children.rbegin()).base()); }
 
+	void clear() { isList = true; parent = this; children.clear(); statement = S(); }	// Memory leak
 };
 
 template <class S>
@@ -112,11 +114,13 @@ public:
 			next = str[n];
 			std::cout << "> '" << next << "'\n";
 
-			if(pattern->isConsistent(next))	// Atleast one pattern is consistent with the current token
+			if(pattern->isConsistent(next) && n < str.length())	// Atleast one pattern is consistent with the current token
 			{
 				string += next;
 				pattern = pattern->branch[next];
 				n++;
+				if(pattern == &patternTrie)
+					string = "";
 			}
 			else
 			if(pattern->isFinished())			// Atleast one pattern is finished
@@ -125,10 +129,23 @@ public:
 				group = group->removeGroup();
 				group = group->newGroup();
 				string = "";
-				pattern = &patternTrie;
+				if(patternTrie.branch[SUBPATTERN_SYMBOL])
+				{
+					pattern = patternTrie.branch[SUBPATTERN_SYMBOL]; 
+				}
+				else
+				{
+					pattern = &patternTrie;
+				}
 			}
 			else
-			if(pattern->hasSubPattern())		// Atleast one pattern is consistent with a sub pattern
+			if(pattern->terminates())
+			{
+				pattern = &patternTrie;
+				string = "";
+			}
+			else
+			if(pattern->hasSubPattern() && pattern != &patternTrie)		// Atleast one pattern is consistent with a sub pattern
 			{
 				parentPatterns.push(ParentContainer<S>(pattern->getReturnPoint(), group, string));
 				group = group->newGroup();
@@ -144,7 +161,11 @@ public:
 					group	= parentPatterns.top().group;
 					string	= parentPatterns.top().string;
 					parentPatterns.pop();
-				}else
+				}else if(pattern == patternTrie.branch[SUBPATTERN_SYMBOL])
+				{
+					pattern = &patternTrie;
+				}
+				else
 				if(n == str.length())
 					n++;
 				else
@@ -159,8 +180,8 @@ public:
 	void addPattern(Pattern<S> p) {
 		patternTrie.add(p.pattern, new Pattern<S>(p), p.handler);
 	}
-	void addPattern_(DFA_Trie<Pattern<S>,StatementTree<S> > * p) {
-		patternTrie.add_(p);
+	void addPattern(DFA_Trie<Pattern<S>,StatementTree<S> > * p) {
+		patternTrie.add(p);
 	}
 };
 

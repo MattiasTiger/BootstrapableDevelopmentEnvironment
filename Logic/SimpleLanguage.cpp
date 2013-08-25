@@ -16,26 +16,31 @@ void simple_language_test()
 	//DFA_Trie<Pattern<LogicBlock*>,StatementTree<LogicBlock*> > * pat = p_regexp.parse("abc", (Pattern<LogicBlock*>*)1337);
 	//DFA_Trie<Pattern<LogicBlock*>,StatementTree<LogicBlock*> > * pat = p_regexp.parse("( |\t|\n)*", (Pattern<LogicBlock*>*)0);
 	
-	p.addPattern_(p_regexp.parse("( |\t|\n)*", 0));
+	p.addPattern(p_regexp.parse("( |\t|\n)*", 0));
+	p.addPattern(p_regexp.parse("\\$( |\t|\n)*", 0));
 	Pattern_logic * l = new Pattern_logic("(0|1|2|3|4|5|6|7|8|9)",handler_constant);
-	p.addPattern_(p_regexp.parse("(0|1|2|3|4|5|6|7|8|9)", l));
+	p.addPattern(p_regexp.parse(l->pattern, l));	
+	p.addPattern(p_regexp.parse(";", 0, true));
+	//Pattern_logic * p2 = new Pattern_logic("{\\$(;\\$)*}",handler_multipleStatements);
+	//p.addPattern(p_regexp.parse(p2->pattern, p2));
+	Pattern_logic * p2 = new Pattern_logic("{(\\$)*}",handler_multipleStatements);
+	p.addPattern(p_regexp.parse(p2->pattern, p2));
 
 	//p.addPattern(Pattern_logic("0", handler_constant));
 	//p.addPattern(Pattern_logic("1", handler_constant));
 	//p.addPattern(Pattern_logic("5", handler_constant));
 	p.addPattern(Pattern_logic("int a", handler_variableDeclaration));
+	p.addPattern(Pattern_logic("int b", handler_variableDeclaration));
 	p.addPattern(Pattern_logic("a", handler_variable));
-	p.addPattern(Pattern_logic("if($) $ else $", handler_if));
-	p.addPattern(Pattern_logic("while($) $", handler_while));
-	p.addPattern(Pattern_logic("==$", handler_equal));
-	p.addPattern(Pattern_logic("+$", handler_add));
-	p.addPattern(Pattern_logic("=$", handler_store));
-	p.addPattern(Pattern_logic("=$;", handler_store));
+	p.addPattern(Pattern_logic("b", handler_variable));
+	p.addPattern(Pattern_logic("if($)$else$", handler_if));
+	p.addPattern(Pattern_logic("while($)$", handler_while));
+	p.addPattern(Pattern_logic("$==$", handler_equal));
+	p.addPattern(Pattern_logic("$+$", handler_add));
+	p.addPattern(Pattern_logic("$=$", handler_store));
 	p.addPattern(Pattern_logic("print($)", handler_print));
-	p.addPattern(Pattern_logic("{$}", handler_multipleStatements));
+	//p.addPattern(Pattern_logic("{$}", handler_multipleStatements));
 	p.addPattern(Pattern_logic("($)", handler_paranthesis));
-	//p.addPattern(Pattern_logic(";", handler_statementSeparation));
-
 
 	std::string in;
 	in = "1+5";
@@ -43,7 +48,12 @@ void simple_language_test()
 	in = "print(1+5)";
 	in = "if(1==0) print(1) else print(0)";
 	in = "{int aa=5;print(a)}";	// Will be solved using a termination property to patterns.
-	in = "{\n\tint a\n\ta = 9 + 2;\n\tprint( a )\n}";
+	in = "{\n\tint a\n\ta = 9 + 2\n\tprint( a )\n}";
+	in = "{int a; a = 5; print(a); print(a+1);}";
+	in = "{\n\tint a;\n\ta = 9 + 3;\n\tprint( a );\n}";
+	in = "{\n\tint a = 1;\n\tint b = 2;\n\tif(a == 1)\n\t{\n\t\tb = a + 4;\n\t}\n\telse\n\t{\n\t\tb = 9;\n\t};\n\tprint(b);\n}";
+	in = "{int a = 5 print(a); print(a+1);}";
+	in = "{\n\tint a = 2;\n\tint b;\n\tif(a == 1)\n\t{\n\t\tb = a + 4;\n\t}\n\telse\n\t{\n\t\tb = 9;\n\t}\n\tprint(b);\n}";
 	p.parse(in);
 	LogicBlock * program = p.statementTree.children.front()->statement;
 	std::cout << "\nin:\n" << in << "\n\nout:\n";
@@ -83,7 +93,7 @@ bool handler_variable(StatementTree_logic & st, Pattern_logic & p, std::string &
 }
 bool handler_variableDeclaration(StatementTree_logic & st, Pattern_logic & p, std::string & str)
 {
-	
+	trim(str, " \t\n");
 	std::list<std::string> parts;
 	split(str, ' ', parts);
 	std::string typeName = parts.front();
@@ -95,6 +105,7 @@ bool handler_variableDeclaration(StatementTree_logic & st, Pattern_logic & p, st
 		std::cout << "Error: No type named \"" << typeName << "\" declared!\n";
 	else
 	{
+		// TODO: add a "declare variable" LogicBlock so that it is done at runtime... (in the right context)
 		char * variable = memoryManager.allocate(type);
 		memoryManager.addVariable(variableName, variable);
 		LogicBlock_data * data = new LogicBlock_data;
