@@ -1,6 +1,6 @@
 
 #include "LogicBlock.h"
-#include "../Parser.h"
+#include "../ParserExtended.h"
 #include "../RegularExpressionParser.h"
 
 #ifndef _SIMPLE_LANGUAGE_H
@@ -8,11 +8,13 @@
 
 void simple_language_test();
 
-
 typedef StatementTree<LogicBlock*> StatementTree_logic;
 typedef Pattern<LogicBlock*> Pattern_logic;
 
+bool handler_error(StatementTree_logic & st, Pattern_logic & p, std::string & str);
+bool handler_NOP(StatementTree_logic & st, Pattern_logic & p, std::string & str);
 bool handler_constant(StatementTree_logic & st, Pattern_logic & p, std::string & str);
+bool handler_integer(StatementTree_logic & st, Pattern_logic & p, std::string & str);
 bool handler_variable(StatementTree_logic & st, Pattern_logic & p, std::string & str);
 bool handler_variableDeclaration(StatementTree_logic & st, Pattern_logic & p, std::string & str);
 bool handler_if(StatementTree_logic & st, Pattern_logic & p, std::string & str);

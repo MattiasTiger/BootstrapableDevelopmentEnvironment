@@ -20,11 +20,12 @@ typedef DFA_Trie<Pattern<Statement_regexp>,StatementTree<Statement_regexp> > DFA
 class Statement_regexp
 {
 public:
-	DFA_Trie_regexp * start;
-	std::list<DFA_Trie_regexp *> goals;
+    DFA<Pattern<Statement_regexp>,StatementTree<Statement_regexp> > dfa;
+	//DFA_Trie_regexp * start;
+	//std::list<DFA_Trie_regexp *> goals;
 public:
 	std::string str;
-	Statement_regexp() { start = 0; }
+	Statement_regexp() { dfa.start = 0; }
 	Statement_regexp(std::string str) : str(str) {}
 };
 
@@ -32,33 +33,31 @@ public:
 template <class S>
 class Statement_regexp_
 {
-	typedef DFA_Trie<Pattern<S>,StatementTree<S> > DFA;
+	typedef DFA_Trie<Pattern<S>,StatementTree<S> > dfaTrie;
 public:
-	DFA * start;
-	std::list<DFA *> goals;
+    DFA<Pattern<S>,StatementTree<S> > dfa;
+	//dfaTrie * start;
+	//std::list<dfaTrie *> goals;
 public:
 	std::string str;
-	Statement_regexp_() { start = 0; }
+	Statement_regexp_() { dfa.start = 0; }
 	Statement_regexp_(std::string str) : str(str) {}
 };
-
-//typedef StatementTree<Statement_regexp> StatementTree_regexp;
-//typedef Pattern<Statement_regexp> Pattern_regexp;
 
 template <class S, class S_wrapper>
 class RegularExpressionParser : public Parser<S_wrapper>
 {
 	typedef Pattern<S_wrapper> Pattern_regexp;
-	typedef DFA_Trie<Pattern<S>,StatementTree<S> > DFA;
+	typedef DFA_Trie<Pattern<S>,StatementTree<S> > dfaTrie;
 public:
 	RegularExpressionParser(void) {}
 	~RegularExpressionParser(void) {}
 
 	
-	void parse(std::string str) {
-		Parser::parse(str);
+	S_wrapper * parse(std::string str) {
+		return Parser::parse(str);
 	}
-	DFA * parse(std::string str, Pattern<S> * p, bool terminate = false) {
+	DFA<Pattern<S>,StatementTree<S> > * parse(std::string str, Pattern<S> * p) {
 		parse(str);
 		StatementTree<S_wrapper> st = statementTree.children.front()->statement;
 		statementTree.parent->children.erase((++statementTree.parent->children.rbegin()).base());
@@ -68,41 +67,43 @@ public:
 			st.statement.str += (*i)->statement.str;
 			merge<S,S_wrapper>(&st.statement, &(*i)->statement);
 		}
-		for(std::list<DFA *>::iterator it = st.statement.goals.begin(); it != st.statement.goals.end(); it++) 
+		for(std::list<dfaTrie *>::iterator it = st.statement.dfa.goals.begin(); it != st.statement.dfa.goals.end(); it++) 
 		{
 			(*it)->data = p;
 			if(p)
 				(*it)->handler = p->handler;
-			(*it)->terminate = terminate;
 		}
 		statementTree.clear();
-		return st.statement.start;
+		return new DFA<Pattern<S>,StatementTree<S> >(st.statement.dfa);
 	}
 
 	void init()
 	{
+        ParserHandler<S_wrapper> * h_character = new handler_character<S,S_wrapper>;
+        // Regular expression base rules
+        addPattern("($)", new handler_parentheses<S,S_wrapper>);
+        addPattern("$|$", new handler_divider<S,S_wrapper>);
+        addPattern("$*", new handler_kleinClosure<S,S_wrapper>);
+
+        // Allow for the usage of the special characters
+		addPattern("\\\\", h_character);
+		addPattern("\\(", h_character);
+		addPattern("\\)", h_character);
+		addPattern("\\|", h_character);
+		addPattern("\\*", h_character);
+		addPattern("\\$", h_character);
+		
+        //setErrorHandler(h_character); // Does not work as intended. Cannot easily replace the code below.. ("a|b": captures "a" but "|" finishes before capturing "b"...)
+        
 		std::string c;
 		for(int n = 0; n < 256; n++)
 		{
-			if(n != '(' && n != ')' && n != '|' && n != '$' && n != '\\')
+			if(n != '$' && n != '(' && n != '*' && n != '|')
 			{
 				c = char(n);
-				addPattern(Pattern_regexp(c, handler_character<S,S_wrapper>));
+				addPattern(c, h_character);
 			}
 		}
-
-		// Regular expression base rules
-		addPattern(Pattern_regexp("($)", handler_parentheses<S,S_wrapper>));
-		addPattern(Pattern_regexp("$|$", handler_divider<S,S_wrapper>));
-		addPattern(Pattern_regexp("$*", handler_kleinClosure<S,S_wrapper>));
-
-		// Allow for the usage of the special characters
-		addPattern(Pattern_regexp("\\\\", handler_character<S,S_wrapper>));
-		addPattern(Pattern_regexp("\\(", handler_character<S,S_wrapper>));
-		addPattern(Pattern_regexp("\\)", handler_character<S,S_wrapper>));
-		addPattern(Pattern_regexp("\\|", handler_character<S,S_wrapper>));
-		addPattern(Pattern_regexp("\\*", handler_character<S,S_wrapper>));
-		addPattern(Pattern_regexp("\\$", handler_character<S,S_wrapper>));
 	}
 };
 
@@ -111,27 +112,27 @@ public:
 template <class S, class S_wrapper>
 void merge(S_wrapper * s1, S_wrapper * s2)
 {
-	for(std::list<DFA_Trie<Pattern<S>,StatementTree<S> > *>::iterator it = s1->goals.begin(); it != s1->goals.end(); it++) 
+	for(std::list<DFA_Trie<Pattern<S>,StatementTree<S> > *>::iterator it = s1->dfa.goals.begin(); it != s1->dfa.goals.end(); it++) 
 		(*it)->data = 0;// Clear debug info..
-	for(std::list<DFA_Trie<Pattern<S>,StatementTree<S> > *>::iterator it = s1->goals.begin(); it != s1->goals.end(); it++) 
-		merge(*it, s2->start, s2->goals);
-	s1->goals.clear();
-	s2->goals.unique();
-	s1->goals.assign(s2->goals.begin(), s2->goals.end());
+	for(std::list<DFA_Trie<Pattern<S>,StatementTree<S> > *>::iterator it = s1->dfa.goals.begin(); it != s1->dfa.goals.end(); it++) 
+		merge(*it, s2->dfa.start, s2->dfa.goals);
+	s1->dfa.goals.clear();
+	s2->dfa.goals.unique();
+	s1->dfa.goals.assign(s2->dfa.goals.begin(), s2->dfa.goals.end());
 }
 template <class S, class S_wrapper>
 void mergeAll(StatementTree<S_wrapper> & st)
 {
 		if(st.isList)
 		{
-			if(st.children.empty())
-				std::cout << "Error: StatementTree::mergeAll - is a list but have no children\n";
-			else if(st.children.size() == 1)
+			//if(st.children.empty())
+			//	std::cout << "Error: StatementTree::mergeAll - is a list but have no children\n";
+			if(st.children.size() == 1)
 			{
 				mergeAll<S,S_wrapper>(*st.children.front());
 				st.statement = st.children.front()->statement;
 			}
-			else
+			else if(st.children.size() > 1)
 			{
 				mergeAll<S,S_wrapper>(*st.children.front());
 				for(std::list<StatementTree<S_wrapper>*>::iterator it = ++st.children.begin(); it != st.children.end(); it++)
@@ -170,72 +171,209 @@ void mergeAllPre(StatementTree<S_wrapper> & st)
 // Handlers
 // ----------------------
 template <class S, class S_wrapper>
-bool handler_character(StatementTree<S_wrapper> & st, Pattern<S_wrapper> & p, std::string & str)
+class handler_character : public ParserHandler<S_wrapper>
 {
-	typedef DFA_Trie<Pattern<S>,StatementTree<S> > DFA;
+bool operator()(StatementTree<S_wrapper> & st, Pattern<S_wrapper> & p, std::string & str)
+{
+	typedef DFA_Trie<Pattern<S>,StatementTree<S> > dfaTrie;
 	st.statement.str = str.back();
-	st.statement.start = new DFA();
-	st.statement.goals.push_back(new DFA());
-	st.statement.start->add_branch(str.back(), st.statement.goals.front());
-	st.statement.goals.front()->data = (Pattern<S>*)1;	// Debug... fix this
+	st.statement.dfa.start = new dfaTrie();
+	st.statement.dfa.goals.push_back(new dfaTrie());
+	st.statement.dfa.start->add_branch(str.back(), st.statement.dfa.goals.front());
+	st.statement.dfa.goals.front()->data = (Pattern<S>*)1;	// Debug... fix this
 	st.isList = false;
 	return true;
 }
+};
 template <class S, class S_wrapper>
-bool handler_parentheses(StatementTree<S_wrapper> & st, Pattern<S_wrapper> & p, std::string & str)
+class handler_parentheses : public ParserHandler<S_wrapper>
+{
+bool operator()(StatementTree<S_wrapper> & st, Pattern<S_wrapper> & p, std::string & str)
 {
 	mergeAll<S,S_wrapper>(st);
 	st.statement.str = "(" + st.statement.str + ")";
 	return true;
 }
+};
 template <class S, class S_wrapper>
-bool handler_divider(StatementTree<S_wrapper> & st, Pattern<S_wrapper> & p, std::string & str)
+class handler_divider : public ParserHandler<S_wrapper>
 {
-	typedef DFA_Trie<Pattern<S>,StatementTree<S> > DFA;
+bool operator()(StatementTree<S_wrapper> & st, Pattern<S_wrapper> & p, std::string & str)
+{
+	typedef DFA_Trie<Pattern<S>,StatementTree<S> > dfaTrie;
 	mergeAllPre<S,S_wrapper>(st);
 	mergeAll<S,S_wrapper>(st);
 	st.statement.str = st.firstPre()->statement.str + "|" + st.statement.str;
 
-	merge(st.statement.start, st.firstPre()->statement.start, st.statement.goals);
-	for(std::list<DFA *>::iterator it = st.firstPre()->statement.goals.begin(); it != st.firstPre()->statement.goals.end(); it++)
-		st.statement.goals.push_back(*it);
-	st.statement.goals.unique();
+	merge(st.statement.dfa.start, st.firstPre()->statement.dfa.start, st.statement.dfa.goals);
+	for(std::list<dfaTrie *>::iterator it = st.firstPre()->statement.dfa.goals.begin(); it != st.firstPre()->statement.dfa.goals.end(); it++)
+		st.statement.dfa.goals.push_back(*it);
+	st.statement.dfa.goals.unique();
 
 	st.removeFirstPre();
 	return true;
 }
+};
 template <class S, class S_wrapper>
-bool handler_kleinClosure(StatementTree<S_wrapper> & st, Pattern<S_wrapper> & p, std::string & str)
+class handler_kleinClosure : public ParserHandler<S_wrapper>
 {
-	typedef DFA_Trie<Pattern<S>,StatementTree<S> > DFA;
+bool operator()(StatementTree<S_wrapper> & st, Pattern<S_wrapper> & p, std::string & str)
+{
+	typedef DFA_Trie<Pattern<S>,StatementTree<S> > dfaTrie;
 	mergeAll<S,S_wrapper>(*st.firstPre());
 	st.statement = st.firstPre()->statement;
 	st.statement.str += "*";
-	std::list<DFA *> goals(st.statement.goals);
-	//for(std::list<Trie*>::iterator it = st.statement.goals.begin(); it != st.statement.goals.end(); it++)
-	//	merge(st.statement.start,*it, goals);
-	for(std::list<DFA*>::iterator goal = st.statement.goals.begin(); goal != st.statement.goals.end(); goal++)
+	std::list<dfaTrie *> goals(st.statement.dfa.goals);
+	//for(std::list<Trie*>::iterator it = st.statement.dfa.goals.begin(); it != st.statement.dfa.goals.end(); it++)
+	//	merge(st.statement.dfa.start,*it, goals);
+	for(std::list<dfaTrie*>::iterator goal = st.statement.dfa.goals.begin(); goal != st.statement.dfa.goals.end(); goal++)
 	{
-		if(st.statement.start->isFinished() && st.statement.start->data != (*goal)->data)
+		if(st.statement.dfa.start->isFinished() && st.statement.dfa.start->data != (*goal)->data)
 			std::cout << "kleinClosure: inconsistent pattern; different goal handlers, cannot merge\n";
-		st.statement.start->data = (*goal)->data;
+		st.statement.dfa.start->data = (*goal)->data;
 
-		for(std::list<DFA*>::iterator parent = (*goal)->parents.begin(); parent != (*goal)->parents.end(); parent++)
+		for(std::list<dfaTrie*>::iterator parent = (*goal)->parents.begin(); parent != (*goal)->parents.end(); parent++)
 			for(int b = 0; b < 256; b++)
 					if((*parent)->branch[b] == *goal)
 					{
-						//(*parent)->add_branch(b, st.statement.start);
-						(*parent)->branch[b] = st.statement.start;
+						//(*parent)->add_branch(b, st.statement.dfa.start);
+						(*parent)->branch[b] = st.statement.dfa.start;
 					}
 	}
-	st.statement.goals.clear();
-	st.statement.goals.push_back(st.statement.start);
+	st.statement.dfa.goals.clear();
+	st.statement.dfa.goals.push_back(st.statement.dfa.start);
 	st.removeFirstPre();
 	st.isList = false;
 	return true;
 }
+};
 
-// Debug
-void test_RegularExpressionParser();
+
+///////////////////////////
+
+
+
+// dfaTrie injection test
+template <class S, class S_wrapper>
+class handler_injectDFA : public ParserHandler<S_wrapper>
+{
+private:
+    DFA<Pattern<S>,StatementTree<S> > * dfa;
+public:
+    handler_injectDFA(DFA<Pattern<S>,StatementTree<S> > * dfa) : dfa(dfa) {}
+    bool operator()(StatementTree<S_wrapper> & st, Pattern<S_wrapper> & p, std::string & str)
+    {
+        //std::cout << "handler_injectDFA\n";
+
+        st.statement.dfa.start = new DFA_Trie<Pattern<S>,StatementTree<S> >;
+        deepCopy(dfa->start, st.statement.dfa.start, st.statement.dfa.goals);
+        st.isList = false;
+        return true;
+    }
+};
+template <class S>
+class handler_injectStatement : public ParserHandler<S>
+{
+private:
+    S * statement;
+public:
+    handler_injectStatement(S * statement) : statement(statement) {}
+    bool operator()(StatementTree<S> & st, Pattern<S> & p, std::string & str)
+    {
+        std::cout << "handler_injectStatement\n";
+        st.statement = *statement;
+        st.isList = false;
+        return true;
+    }
+};
+
+
+
+
+
+////////////////////////
+
+#include "ParserExtended.h"
+
+// Regexp
+template <class S>
+class h_regexp_parentheses : public ParserHandler<ParserStatement<S> >
+{
+bool operator()(StatementTree<ParserStatement<S> > & st, Pattern<ParserStatement<S> > & p, std::string & str)
+{
+	mergeAll<S,ParserStatement<S> >(st);
+	st.statement.str = "(" + st.statement.str + ")";
+	return true;
+}
+};
+template <class S>
+class h_regexp_divider : public ParserHandler<ParserStatement<S> >
+{
+bool operator()(StatementTree<ParserStatement<S> > & st, Pattern<ParserStatement<S> > & p, std::string & str)
+{
+	typedef DFA_Trie<Pattern<S>,StatementTree<S> > DFA_Trie_S;
+	mergeAllPre<S,ParserStatement<S> >(st);
+	mergeAll<S,ParserStatement<S> >(st);
+	st.statement.str = st.firstPre()->statement.str + "|" + st.statement.str;
+
+	merge(st.statement.dfa.start, st.firstPre()->statement.dfa.start, st.statement.dfa.goals);
+	for(std::list<DFA_Trie_S *>::iterator it = st.firstPre()->statement.dfa.goals.begin(); it != st.firstPre()->statement.dfa.goals.end(); it++)
+		st.statement.dfa.goals.push_back(*it);
+	st.statement.dfa.goals.unique();
+
+	st.removeFirstPre();
+	return true;
+}
+};
+template <class S>
+class h_regexp_kleinClosure : public ParserHandler<ParserStatement<S> >
+{
+bool operator()(StatementTree<ParserStatement<S> > & st, Pattern<ParserStatement<S> > & p, std::string & str)
+{
+	typedef DFA_Trie<Pattern<S>,StatementTree<S> > DFA_Trie_S;
+	mergeAll<S,ParserStatement<S> >(*st.firstPre());
+	st.statement = st.firstPre()->statement;
+	st.statement.str += "*";
+	std::list<DFA_Trie_S *> goals(st.statement.dfa.goals);
+	//for(std::list<Trie*>::iterator it = st.statement.dfa.goals.begin(); it != st.statement.dfa.goals.end(); it++)
+	//	merge(st.statement.dfa.start,*it, goals);
+	for(std::list<DFA_Trie_S*>::iterator goal = st.statement.dfa.goals.begin(); goal != st.statement.dfa.goals.end(); goal++)
+	{
+		if(st.statement.dfa.start->isFinished() && st.statement.dfa.start->data != (*goal)->data)
+			std::cout << "kleinClosure: inconsistent pattern; different goal handlers, cannot merge\n";
+		st.statement.dfa.start->data = (*goal)->data;
+
+		for(std::list<DFA_Trie_S*>::iterator parent = (*goal)->parents.begin(); parent != (*goal)->parents.end(); parent++)
+			for(int b = 0; b < 256; b++)
+					if((*parent)->branch[b] == *goal)
+					{
+						//(*parent)->add_branch(b, st.statement.dfa.start);
+						(*parent)->branch[b] = st.statement.dfa.start;
+					}
+	}
+	st.statement.dfa.goals.clear();
+	st.statement.dfa.goals.push_back(st.statement.dfa.start);
+	st.removeFirstPre();
+	st.isList = false;
+	return true;
+}
+};
+
+
+template<typename S>
+class h_regexp_concat : public ParserHandler<ParserStatement<S> >
+{
+bool operator()(StatementTree<ParserStatement<S> > & st, Pattern<ParserStatement<S> > & p, std::string & str)
+{
+    st.children.push_front(st.firstPre());
+    st.removeFirstPre();
+	mergeAll<S,ParserStatement<S> >(st);
+	return true;
+}
+};
+
+
+//////////////////
+std::string getExtendedAsciiCharacterPattern(std::string except = "");
 
 #endif

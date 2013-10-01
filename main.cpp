@@ -1,15 +1,19 @@
 #include <iostream>
 #include <string>
-#include "parser.h"
-#include "ParserTest.h"
-#include "RegularExpressionParser.h"
+#include "testing/parser_test.h"
+#include "testing/RegularExpressionParser_test.h"
+#include "testing/ParserExtended_test.h"
 #include "Logic/SimpleLanguage.h"
+
+#include <fstream>
 
 int main()
 {	
-	//test_RegularExpressionParser();
-	simple_language_test();
-
+	//parser_test();
+	
+    //regularExpressionParser_test();
+    //parser_extended_test();
+    simple_language_test();
 	std::cout << "end\n";
 	std::cin.get();
 

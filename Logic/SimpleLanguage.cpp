@@ -9,58 +9,109 @@ void simple_language_test()
 	memoryManager.addType(new Type("bool", 1));
 	memoryManager.addType(new Type("int", 4));
 
-	Parser<LogicBlock*> p;
-	RegularExpressionParser<LogicBlock*,Statement_regexp_<LogicBlock*> > p_regexp;
-	p_regexp.init();
-	//p_regexp.parse("( |\t|\n)*");
-	//DFA_Trie<Pattern<LogicBlock*>,StatementTree<LogicBlock*> > * pat = p_regexp.parse("abc", (Pattern<LogicBlock*>*)1337);
-	//DFA_Trie<Pattern<LogicBlock*>,StatementTree<LogicBlock*> > * pat = p_regexp.parse("( |\t|\n)*", (Pattern<LogicBlock*>*)0);
-	
-	p.addPattern(p_regexp.parse("( |\t|\n)*", 0));
-	p.addPattern(p_regexp.parse("\\$( |\t|\n)*", 0));
-	Pattern_logic * l = new Pattern_logic("(0|1|2|3|4|5|6|7|8|9)",handler_constant);
-	p.addPattern(p_regexp.parse(l->pattern, l));	
-	p.addPattern(p_regexp.parse(";", 0, true));
-	//Pattern_logic * p2 = new Pattern_logic("{\\$(;\\$)*}",handler_multipleStatements);
-	//p.addPattern(p_regexp.parse(p2->pattern, p2));
-	Pattern_logic * p2 = new Pattern_logic("{(\\$)*}",handler_multipleStatements);
-	p.addPattern(p_regexp.parse(p2->pattern, p2));
+    
+    ParserExtended<ParserStatement<LogicBlock*> > regExpParser;
+    regExpParser.addPattern("\\$\\$",  new h_regexp_concat<LogicBlock*>);
+    regExpParser.addPattern("(\\$)",  new h_regexp_parentheses<LogicBlock*>);
+    regExpParser.addPattern("\\$|\\$",  new h_regexp_divider<LogicBlock*>);
+    regExpParser.addPattern("\\$*",   new h_regexp_kleinClosure<LogicBlock*>);
+    regExpParser.addPattern("\\\\", new h_regexp_character<LogicBlock*>);
+	regExpParser.addPattern("\\(",  new h_regexp_character<LogicBlock*>);
+	regExpParser.addPattern("\\)",  new h_regexp_character<LogicBlock*>);
+	regExpParser.addPattern("\\|",  new h_regexp_character<LogicBlock*>);
+	regExpParser.addPattern("\\*",  new h_regexp_character<LogicBlock*>);
+	regExpParser.addPattern("\\\\$",  new h_regexp_character<LogicBlock*>);
+    std::string c;
+	for(int n = 0; n < 128; n++)
+	{
+        if(n != '$' && n != '(' && n != ')' && n != '*' && n != '|')
+		{
+		    c = char(n);
+			regExpParser.addPattern(c, new h_regexp_character<LogicBlock*>);
+		}
+	}
+    ParserExtended<LogicBlock*> p;
+    p.assignPreParser(&regExpParser);
+    p.addPattern("\\$", "\\$");  // Allow sub patterns..
+    
+    //p.addPattern("(0|1|2|3|4|5|6|7|8|9)",handler_constant);
+    p.addPattern("(0|1|2|3|4|5|6|7|8|9)(0|1|2|3|4|5|6|7|8|9)*",handler_integer);
+    p.addPattern("\\word","(a|b|c)(a|b|c|0|1|2|3|4|5|6|7|8|9)*");
+	p.addPattern("( |\t|\n)( |\t|\n)*", handler_NOP);
+    p.addPattern("\\ ", "( )");
+    p.addPattern(" ", "( |\t|\n)*");
+    
+    p.addPattern("{ (\\$ )*} ", handler_multipleStatements);
+	p.addPattern("int\\ \\word", handler_variableDeclaration);
+	p.addPattern("\\word", handler_variable);
+	p.addPattern(" ; ", handler_NOP);
+	p.addPattern("if \\( \\$ \\) \\$ else \\$", handler_if);
+	p.addPattern("while\\(\\$\\)\\$", handler_while);
+	p.addPattern("\\$ == \\$", handler_equal);
+	p.addPattern("\\$ + \\$", handler_add);
+	p.addPattern("\\$ = \\$", handler_store);
+	p.addPattern("print\\( \\$ \\)", handler_print);
+	p.addPattern("\\(\\$\\)", handler_paranthesis);
+    
+    //p.setErrorHandler(handler_error);
+    
+    std::vector<std::string> input;
+        
+    input.push_back("1+2");
+    input.push_back("1+5+1");
+    input.push_back("print(1+5)");
+	input.push_back("if(1==1)print(1)elseprint(2)");
+	input.push_back("if(1 == 0)\n\tprint(1)\nelse\n\tprint(2)");
+	input.push_back("{print(5) ; print(6)}");
+    
+	input.push_back("{\n\tint a;\n\ta = 9 + 2;\n\tprint( a );\n}");
+    input.push_back("{\n\tint cba = 1;\n\tint b2;\n\tif(cba == 1)\n\t{\n\t\tb2 = cba + 45;\n\t}\n\telse\n\t{\n\t\tb2 = 9;\n\t}\n\tprint(b2);\n}");
+    
+    LogicBlock * program;
+    for(int n = 0; n < input.size(); n++)
+    {
+        std::cout << "\nProgram #" << n+1 << "\n-----------------\n";
+	    std::cout << "INPUT:\n" << input[n];
+	    p.parse(input[n]);
+	    program = p.statementTree.children.front()->statement;
+        if(p.statementTree.children.size() > 1)
+        {
+            std::cout << "\nINTERMEDIATE:\n";
+	        program->eval();
+            std::cout << "\nRETURN:\n";
+            if(program->type != 0)
+	            std::cout << *(int*)program->value << "\n";
+            else
+                std::cout << "void" << "\n";
+            delete program;
+        }
+        else
+        {
+            std::cout << "PARSING FAILED!\n";
+        }
+    }
+    std::cout << "\n";
+    
+}
+/*
+bool handler_error(StatementTree_logic & st, Pattern_logic & p, std::string & str)
+{
+    if(str.back() == ';')
+    {
+        st.removeThis();
+	    return true;
+    }
+    else
+    {
+        st.removeThis();
+        return false;
+    }
+}*/
 
-	//p.addPattern(Pattern_logic("0", handler_constant));
-	//p.addPattern(Pattern_logic("1", handler_constant));
-	//p.addPattern(Pattern_logic("5", handler_constant));
-	p.addPattern(Pattern_logic("int a", handler_variableDeclaration));
-	p.addPattern(Pattern_logic("int b", handler_variableDeclaration));
-	p.addPattern(Pattern_logic("a", handler_variable));
-	p.addPattern(Pattern_logic("b", handler_variable));
-	p.addPattern(Pattern_logic("if($)$else$", handler_if));
-	p.addPattern(Pattern_logic("while($)$", handler_while));
-	p.addPattern(Pattern_logic("$==$", handler_equal));
-	p.addPattern(Pattern_logic("$+$", handler_add));
-	p.addPattern(Pattern_logic("$=$", handler_store));
-	p.addPattern(Pattern_logic("print($)", handler_print));
-	//p.addPattern(Pattern_logic("{$}", handler_multipleStatements));
-	p.addPattern(Pattern_logic("($)", handler_paranthesis));
-
-	std::string in;
-	in = "1+5";
-	in = "1+5+1";
-	in = "print(1+5)";
-	in = "if(1==0) print(1) else print(0)";
-	in = "{int aa=5;print(a)}";	// Will be solved using a termination property to patterns.
-	in = "{\n\tint a\n\ta = 9 + 2\n\tprint( a )\n}";
-	in = "{int a; a = 5; print(a); print(a+1);}";
-	in = "{\n\tint a;\n\ta = 9 + 3;\n\tprint( a );\n}";
-	in = "{\n\tint a = 1;\n\tint b = 2;\n\tif(a == 1)\n\t{\n\t\tb = a + 4;\n\t}\n\telse\n\t{\n\t\tb = 9;\n\t};\n\tprint(b);\n}";
-	in = "{int a = 5 print(a); print(a+1);}";
-	in = "{\n\tint a = 2;\n\tint b;\n\tif(a == 1)\n\t{\n\t\tb = a + 4;\n\t}\n\telse\n\t{\n\t\tb = 9;\n\t}\n\tprint(b);\n}";
-	p.parse(in);
-	LogicBlock * program = p.statementTree.children.front()->statement;
-	std::cout << "\nin:\n" << in << "\n\nout:\n";
-	program->eval();
-	std::cout << "\n";
-	//std::cout << *(int*)program->value << "\n";
-
+bool handler_NOP(StatementTree_logic & st, Pattern_logic & p, std::string & str)
+{
+    st.removeThis();
+	return true;
 }
 
 bool handler_constant(StatementTree_logic & st, Pattern_logic & p, std::string & str)
@@ -69,6 +120,21 @@ bool handler_constant(StatementTree_logic & st, Pattern_logic & p, std::string &
 	LogicBlock_data * data = new LogicBlock_data();
 	data->value = memoryManager.allocate(memoryManager.getType("int"));
 	*(int*)data->value = int(str[0] - '0');
+	data->type = memoryManager.getType("int");
+	st.statement = data;
+	st.isList = false;
+	return true;
+}
+#include <sstream>
+bool handler_integer(StatementTree_logic & st, Pattern_logic & p, std::string & str)
+{
+	trim(str, " \t\n");
+	LogicBlock_data * data = new LogicBlock_data();
+	data->value = memoryManager.allocate(memoryManager.getType("int"));
+    std::stringstream ss;
+    ss << str;
+    ss >> *(int*)data->value;
+	//*(int*)data->value = int(str[0] - '0');
 	data->type = memoryManager.getType("int");
 	st.statement = data;
 	st.isList = false;
